@@ -19,7 +19,7 @@ python3 evaluation.py --gpu 0 --model_path ./checkpoint/grid/model --data_root .
 - category: Please select the category that you want to evaluate.
 
 ## Dataset
-This implementation presupporses using **MVTec AD**, so if you'd like to excuse this, you should get MVTec AD bellow link.
+This implementation presupporses to use **MVTec AD**, so if you'd like to excuse this, you should get MVTec AD bellow link.
 MVTec AD: https://www.mvtec.com/company/research/datasets/mvtec-ad
 
 
