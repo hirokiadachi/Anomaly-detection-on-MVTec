@@ -3,7 +3,7 @@ This repo. is the implementation of ICLR 2020 paper, "ITERATIVE ENERGY-BASED PRO
 
 Paper link: https://arxiv.org/abs/2002.03734
 
-The network architecture and training details refer to "[Improving Unsupervised Defect Segmentation
+The network architecture and training details are same as "[Improving Unsupervised Defect Segmentation
 by Applying Structural Similarity To Autoencoders](https://arxiv.org/abs/1807.02011)".
 
 ### training phase
