@@ -4,14 +4,14 @@ This repo. is the implementation of ICLR 2020 paper, "ITERATIVE ENERGY-BASED PRO
 Paper link: (https://arxiv.org/abs/2002.03734)
 
 * training phase
-```when using python3
+```
 python3 train.py --data_root ./mvtec_anomaly_detection --category grid --gpu 0 --epochs 20000
 ```
 - data_root: Please refer to the path up to the MVTec dataset directory.
 - category: Please select the category that you want to train.
 
 * evaluation phase (anomaly detection)
-```when using python3
+```
 python3 evaluation.py --gpu 0 --model_path ./checkpoint/grid/model --data_root ./mvtec_anomaly_detection --category grid
 ```
 - model_path: Please refer to the trained model path.
