@@ -164,4 +164,4 @@ def get_residual_map(recon_img, input_img, img_c):
         ssim_residual_map = ssim(input_img, recon_img, win_size=11, full=True, multichannel=True)[1]
         ssim_residual_map = 1 - np.mean(ssim_residual_map, axis=2)
 
-    return ssim_residual_map
+    return ssim_residual_map / 2

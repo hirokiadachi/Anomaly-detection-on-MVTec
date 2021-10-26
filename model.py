@@ -8,35 +8,54 @@ class VAE(nn.Module):
         self.z_dim = z_dim
         num_layers = 5
         
-        # encode
-        in_ch = input_c
-        out_ch = 16
-        encoder = []
-        for _ in range(num_layers):
-            encoder.append(nn.Conv2d(in_ch, out_ch, kernel_size=4, stride=2, padding=1, bias=False))
-            encoder.append(nn.BatchNorm2d(out_ch))
-            encoder.append(nn.ReLU(inplace=True))
-            in_ch = out_ch
-            out_ch = out_ch*2
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_ch, 32, kernel_size=4, stride=2, padding=1), # 128 -> 64
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 32, kernel_size=4, stride=2, padding=1),    # 64 -> 32 
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),    # 32 -> 32
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),    # 32 -> 16
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),    # 16 -> 16
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),   # 16 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),   # 8 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),    # 8 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, z_dim, kernel_size=8, stride=1))            # 8 -> 1
         
-        self.mu_fc = nn.Linear(in_ch*4**2, z_dim)
-        self.logvar_fc = nn.Linear(in_ch*4**2, z_dim)
-        self.decoder_fc = nn.Linear(z_dim, in_ch*4**2)
+        self.mu_fc = nn.Linear(z_dim, z_dim)
+        self.logvar_fc = nn.Linear(z_dim, z_dim)
 
-        in_ch = in_ch
-        out_ch = 64
-        decoder = []
-        for _ in range(num_layers - 1):
-            decoder.append(nn.ConvTranspose2d(in_ch, out_ch, kernel_size=4, stride=2, padding=1, bias=True))
-            decoder.append(nn.BatchNorm2d(out_ch))
-            decoder.append(nn.ReLU(inplace=True))
-            in_ch = out_ch
-            out_ch = out_ch*2
-        decoder.append(nn.ConvTranspose2d(in_ch, input_c, kernel_size=4, stride=2, padding=1))
-        decoder.append(nn.Sigmoid())
-        
-        self.encoder = nn.Sequential(*encoder)
-        self.decoder = nn.Sequential(*decoder)
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Conv2d(z_dim, 32, kernel_size=3, stride=1, padding=1),  # 1 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),     # 8 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),    # 8 -> 8
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),    # 8 -> 16
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),     # 16 -> 16
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),     # 16 -> 32
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),     # 32 -> 32
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),     # 32 -> 64
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Conv2d(32, in_ch, kernel_size=3, stride=1, padding=1),  # 64 -> 128
+            nn.Sigmoid())
 
     def initialize(self):
         for m in self.modules():
@@ -67,7 +86,7 @@ class VAE(nn.Module):
         logvar = self.logvar_fc(h) # 分散共分散行列の対数
         z      = self.reparameterize(mu, logvar)  # 潜在変数
 
-        x_hat  = self.decoder(self.decoder_fc(z).view(z.size(0), -1, 4, 4))
+        x_hat  = self.decoder(z.view(z.size(0), -1, 1, 1))
         self.mu     = mu.squeeze()
         self.logvar = logvar.squeeze()
         return x_hat

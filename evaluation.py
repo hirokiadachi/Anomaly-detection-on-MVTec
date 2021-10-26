@@ -87,8 +87,8 @@ def anomaly_detection(model, dataloader, threshold_rec, threshold_cls, save_dir,
             loss.backward()
             grads = x.grad.data
             
-            enagy = grads * (x_t - rec_x)**2
-            x_t = x_t - args.alpha*enagy
+            energy = grads * (x_t - rec_x)**2
+            x_t = x_t - args.alpha*energy
             save_image(x_t, index, i+1, save_dir, gif=True)
         
         ssim_res_map = get_residual_map(x_t, x, x.size(1))
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     training_losses, total_rec_ssim = save_dssim_rec(model, training_dataloader)
     
     print("----- start Anomaly detection -----------")
-    quantiles = np.arange(start=0, stop=110, step=10)
+    quantiles = np.arange(start=0, stop=100, step=10)
     for quantile in quantiles:
         result_path = os.path.join(save_path, 'quantiles%d'%quantile)
         os.makedirs(result_path, exist_ok=True)

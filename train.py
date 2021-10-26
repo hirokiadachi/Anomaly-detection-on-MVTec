@@ -38,7 +38,8 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=str, default='0')
     parser.add_argument('--checkpoint', type=str, default='checkpoint')
     parser.add_argument('--alpha', type=float, default=0.5)
-    parser.add_argument('--lr', type=float, default=5e-4)
+    parser.add_argument('--lr', type=float, default=2e-4)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--z_dim', type=int, default=100)
     parser.add_argument('--epochs', type=int, default=300)
@@ -65,7 +66,7 @@ if __name__ == '__main__':
     print('Build training network.')
     channel = next(iter(training_dataloader))[0].size(1)
     model = VAE(z_dim=args.z_dim, input_c=channel).cuda()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.5, 0.999))
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.5, 0.999), weight_decay=args.weight_decay)
     
     for epoch in range(args.epochs):
         training(epoch, model, training_dataloader, optimizer)
