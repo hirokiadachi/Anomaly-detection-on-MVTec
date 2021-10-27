@@ -36,8 +36,7 @@ def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters):
     grads = x_org.grad.data
     x_t = x_org - alpha*grads*(x_org - rec_x)**2
     for i in range(max_iters):
-        x_t = torch.clamp(x_t, min=0, max=1)
-        x_t = Variable(x_t, requires_grad=True)
+        x_t = Variable(x_t.clamp(min=0, max=1), requires_grad=True)
         rec_x = model(x_t).detach()
         rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
         if rec_loss <= th:    break
@@ -64,10 +63,13 @@ def anomaly_detection(model, dataloader, threshold_rec, save_dir, args=None):
         x = x.cuda()
         x.requires_grad_(True)
         reconstructed_x = model(x).detach()
-        optimized_x = optimize(model, index, save_dir, x, reconstructed_x, threshold_rec, 
+        if args.use_grad:
+            final_x = optimize(model, index, save_dir, x, reconstructed_x, threshold_rec, 
                                alpha=args.alpha, lam=args.lam, max_iters=args.max_iters)
+        else:
+            final_x = reconstructed_x
         
-        dssim_map = get_residual_map(optimized_x, x, x.size(1))
+        dssim_map = get_residual_map(final_x, x, x.size(1))
         pred_list.append(dssim_map)
         label_list.append(mask.data.numpy())
         
@@ -91,13 +93,18 @@ def anomaly_detection(model, dataloader, threshold_rec, save_dir, args=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default='')
-    parser.add_argument('--data_root', type=str, default='')
-    parser.add_argument('--category', type=str, default='')
+    parser.add_argument('--model_path', type=str, default='',
+                        help='Pre-trained model path')
+    parser.add_argument('--data_root', type=str, default='',
+                        help='MVTec dataset directory path')
+    parser.add_argument('--category', type=str, default='',
+                        help='Select a category in MVTec dataset.')
     parser.add_argument('--alpha', type=float, default=0.5)
     parser.add_argument('--lam', type=float, default=0.05)
     parser.add_argument('--max_iters', type=int, default=25)
     parser.add_argument('--gpu', type=str, default='0')
+    parser.add_argument('--use_grad', action='store_true',
+                        help='If this argument is true, one detects anomaly samples with the iterative update using the energy function.')
     parser.add_argument('--save_dir', type=str, default='Outputs')
     args = parser.parse_args()
     
