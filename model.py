@@ -6,7 +6,6 @@ class VAE(nn.Module):
         super(VAE, self).__init__()
 
         self.z_dim = z_dim
-        num_layers = 5
         
         # Encoder
         self.encoder = nn.Sequential(
@@ -71,12 +70,12 @@ class VAE(nn.Module):
                 nn.init.constant_(m.bias, 0)
         
     def reparameterize(self, mu, logvar):
-        if self.training:
-            std = logvar.mul(0.5).exp_()
-            eps = std.new(std.size()).normal_()
-            return eps.mul(std).add_(mu)
-        else:
-            return mu
+        #std = logvar.mul(0.5).exp_()
+        #eps = std.new(std.size()).normal_()
+        #return eps.mul(std).add_(mu)
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
 
     def forward(self, x):
         h      = self.encoder(x)

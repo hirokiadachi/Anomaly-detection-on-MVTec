@@ -6,6 +6,7 @@ from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torchvision import transforms as T
 
@@ -145,6 +146,21 @@ class MVTecDataset(Dataset):
 
         return list(x), list(y), list(mask)
     
+def save_rec_loss(model, dataloader):
+    cnt = 0
+    training_losses = np.zeros(len(dataloader.dataset))
+    for (inputs, _) in tqdm(dataloader):
+        inputs = inputs.cuda()
+        batch = inputs.size(0)
+        with torch.no_grad():
+            rec_x = model(inputs)
+        loss = F.binary_cross_entropy(rec_x, inputs, reduction='sum').cpu().data.numpy()
+        training_losses[cnt:cnt+batch] = loss
+        cnt += batch
+        
+    print("train loss size :", len(training_losses))
+    return training_losses
+    
 def torch_img_to_numpy(img):
     # 値の変換
     img = img.detach().cpu().numpy()
@@ -165,3 +181,19 @@ def get_residual_map(recon_img, input_img, img_c):
         ssim_residual_map = 1 - np.mean(ssim_residual_map, axis=2)
 
     return ssim_residual_map / 2
+
+def make_gif(image_dir_path, sample_idx):    
+    img_list = sorted(os.listdir(image_dir_path))
+    PATH_LIST = [Image.open(os.path.join(image_dir_path, img_list[i])) for i in range(len(img_list))]
+    PATH_LIST[0].save(os.path.join(image_dir_path, 'sample_%d.gif' % (sample_idx)), save_all=True, append_images=PATH_LIST)
+    
+def save_image(x, sample_idx, i, dirpath, mask=None):
+    if x.size(1) > 1:
+        img = Image.fromarray((x * 255).clamp(min=0, max=255).squeeze().permute(1,2,0).data.cpu().to(torch.uint8).numpy())
+    else:
+        img = Image.fromarray((x * 255).clamp(min=0, max=255).squeeze().data.cpu().to(torch.uint8).numpy())
+    
+    if mask:
+        img.save(os.path.join(dirpath, 'mask_sample%d.png' % sample_idx))
+    else:
+        img.save(os.path.join(dirpath, '{:0>6}.png'.format(i)))

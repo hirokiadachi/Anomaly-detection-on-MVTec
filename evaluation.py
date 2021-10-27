@@ -22,82 +22,55 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 
 from model import VAE
-from utils import return_MVTecAD_loader, MVTecDataset, torch_img_to_numpy, get_residual_map
+from utils import *
 
-def save_dssim_rec(model, dataloader):
-    cnt = 0
-    training_losses = np.zeros(len(dataloader.dataset))
-    total_rec_ssim = np.zeros((len(dataloader.dataset), 128, 128))
-    for (inputs, _) in tqdm(dataloader):
-        inputs = inputs.cuda()
-        batch = inputs.size(0)
-        with torch.no_grad():
-            rec_x = model(inputs)
-        loss = F.binary_cross_entropy(rec_x, inputs, reduction='sum').cpu().data.numpy()
-        ssim_res_map = get_residual_map(rec_x, inputs, inputs.size(1))
-        training_losses[cnt:cnt+batch] = loss
-        total_rec_ssim[cnt:cnt+batch]  = ssim_res_map
-        cnt += batch
-        
-    print("train loss size :", len(training_losses))
-    print("train ssim size :", len(total_rec_ssim))
-    return training_losses, total_rec_ssim
-
-def save_image(x, sample_idx, i, dirpath, mask=None, gif=False):
-    save_dir_name = os.path.join(dirpath, 'sample_%d' % sample_idx)
-    os.makedirs(save_dir_name, exist_ok=True)
-    if x.size(1) > 1:
-        img = Image.fromarray((x * 255).clamp(min=0, max=255).squeeze().permute(1,2,0).data.cpu().to(torch.uint8).numpy())
-    else:
-        img = Image.fromarray((x * 255).clamp(min=0, max=255).squeeze().data.cpu().to(torch.uint8).numpy())
+def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters):
+    rec_path = os.path.join(save_dir, 'reconstructed_images', 'sample_%d' % index)
+    opt_path = os.path.join(save_dir, 'optimized_images', 'sample_%d' % index)
+    os.makedirs(rec_path, exist_ok=True)
+    os.makedirs(opt_path, exist_ok=True)
+    save_image(x_org, index, 0, opt_path)
     
-    if mask:
-        img.save(os.path.join(save_dir_name, 'mask.png'))
-    else:
-        img.save(os.path.join(save_dir_name, '{:0>6}.png'.format(i)))
-    
-    if gif:
-        img_list = sorted(os.listdir(save_dir_name))[:-2]
-        PATH_LIST = [Image.open(os.path.join(save_dir_name, img_list[i])) for i in range(len(img_list))]
-        PATH_LIST[0].save(os.path.join(save_dir_name, 'sample_%d.gif' % (sample_idx)), save_all=True, append_images=PATH_LIST[1:])
-    
-def anomaly_detection(model, dataloader, threshold_rec, threshold_cls, save_dir, lower=0, upper=1, args=None):
-    pred_list, label_list = [], []
-    for index, (x, y, mask) in tqdm(enumerate(dataloader), desc='Quantile %d' % quantile):
-        x = x.cuda()
-        save_image(x, index, 0, save_dir, gif=False)
-        save_image(mask, index, 0, save_dir, mask=True, gif=False)
-        label = mask.max()
-        x.requires_grad_(True)
-        rec_x = model(x).detach()
-        loss = F.binary_cross_entropy(x, rec_x, reduction='sum')
+    loss = F.binary_cross_entropy(x_org, rec_x, reduction='sum')
+    loss.backward()
+    grads = x_org.grad.data
+    x_t = x_org - alpha*grads*(x_org - rec_x)**2
+    for i in range(max_iters):
+        x_t = torch.clamp(x_t, min=0, max=1)
+        x_t = Variable(x_t, requires_grad=True)
+        rec_x = model(x_t).detach()
+        rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
+        if rec_loss <= th:    break
+        l1 = torch.abs(x_t - x_org).sum()
+        loss = rec_loss + lam*l1
         loss.backward()
+        grads = x_t.grad.data
         
-        grads = x.grad.data
-        x_t = x - args.alpha*grads*(x - rec_x)**2
-        
-        for i in range(args.max_iters):
-            x_t = torch.clamp(x_t, min=0, max=1)
-            x_t = Variable(x_t, requires_grad=True)
-            rec_x = model(x_t).detach()
-            rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
-            if rec_loss <= threshold_rec:    break
-            l1 = torch.abs(x_t - x).sum()
-            loss = rec_loss + args.lam*l1
-            loss.backward()
-            grads = x.grad.data
-            
-            energy = grads * (x_t - rec_x)**2
-            x_t = x_t - args.alpha*energy
-            save_image(x_t, index, i+1, save_dir, gif=True)
-        
-        ssim_res_map = get_residual_map(x_t, x, x.size(1))
-        mask_pred = np.zeros((128, 128))
-        mask_pred[ssim_res_map > threshold_cls] = 1
-        
-        pred_list.append(mask_pred)
-        label_list.append(mask.data.numpy())
+        energy = grads * (x_t - rec_x)**2
+        x_t = x_t - alpha*energy
+        save_image(rec_x, index, i+1, rec_path)
+        save_image(x_t, index, i+1, opt_path)
     
+    make_gif(image_dir_path=opt_path, sample_idx=index)
+    return rec_x
+    
+def anomaly_detection(model, dataloader, threshold_rec, save_dir, args=None):
+    pred_list, label_list = [], []
+    for index, (x, y, mask) in tqdm(enumerate(dataloader)):
+        mask_path = os.path.join(save_dir, 'mask_images')
+        os.makedirs(mask_path, exist_ok=True)
+        save_image(mask, index, 0, mask_path, mask=True)
+        
+        x = x.cuda()
+        x.requires_grad_(True)
+        reconstructed_x = model(x).detach()
+        optimized_x = optimize(model, index, save_dir, x, reconstructed_x, threshold_rec, 
+                               alpha=args.alpha, lam=args.lam, max_iters=args.max_iters)
+        
+        dssim_map = get_residual_map(optimized_x, x, x.size(1))
+        pred_list.append(dssim_map)
+        label_list.append(mask.data.numpy())
+        
     label_np = np.array(label_list).reshape(-1)
     pred_np = np.array(pred_list).reshape(-1)
     fpr, tpr, thresholds = roc_curve(label_np, pred_np)
@@ -106,16 +79,14 @@ def anomaly_detection(model, dataloader, threshold_rec, threshold_cls, save_dir,
     plt.xlabel('FPR: False positive rate')
     plt.ylabel('TPR: True positive rate')
     plt.grid()
-    fig.savefig(save_dir + '/roc_curve_quantile_'+str(quantile)+'.pdf')
-    fig.savefig(save_dir + '/roc_curve_quantile_'+str(quantile)+'.png')
+    fig.savefig(save_dir + '/roc_curve.pdf')
+    fig.savefig(save_dir + '/roc_curve.png')
     
     auroc_score = roc_auc_score(label_np, pred_np)
     print("auroc_score :", auroc_score, "\n")
     
     with open(save_dir + 'auroc_score.txt', 'a') as f:
-        print("quantile :", quantile, file=f)
         print("Reconstruction threshold :", threshold_rec, file=f)
-        print("Classification threshold :", threshold_cls, file=f)
         print("auroc_score :", auroc_score, "\n", file=f)
 
 if __name__ == '__main__':
@@ -155,19 +126,15 @@ if __name__ == '__main__':
     model.load_state_dict(state_dict)
     model.eval()
     
-    print('Start to record reconstruction loss and DSSIM score for calculating threshold.')
-    training_losses, total_rec_ssim = save_dssim_rec(model, training_dataloader)
+    print('Start to record reconstruction loss for calculating threshold.')
+    training_losses = save_rec_loss(model, training_dataloader)
     
     print("----- start Anomaly detection -----------")
-    quantiles = np.arange(start=0, stop=100, step=10)
-    for quantile in quantiles:
-        result_path = os.path.join(save_path, 'quantiles%d'%quantile)
-        os.makedirs(result_path, exist_ok=True)
-        threshold_rec = np.percentile(training_losses, 0)
-        print("Reconstruction threshold: ", threshold_rec)
-        threshold_cls = float(np.percentile(total_rec_ssim, quantile))
-        print("Classification threshold :", threshold_cls)
-        anomaly_detection(model, test_dataloader, threshold_rec, threshold_cls, result_path, lower=0, upper=1, args=args)
+    result_path = os.path.join(save_path, 'results')
+    os.makedirs(result_path, exist_ok=True)
+    threshold_rec = np.percentile(training_losses, 0)
+    print("Reconstruction threshold: ", threshold_rec)
+    anomaly_detection(model, test_dataloader, threshold_rec, result_path, args=args)
     print("----- end Anomaly detection -------------")
         
         
