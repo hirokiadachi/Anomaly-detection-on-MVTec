@@ -163,7 +163,7 @@ if __name__ == '__main__':
     for quantile in quantiles:
         result_path = os.path.join(save_path, 'quantiles%d'%quantile)
         os.makedirs(result_path, exist_ok=True)
-        threshold_rec = np.percentile(training_losses, quantile)
+        threshold_rec = np.percentile(training_losses, 0)
         print("Reconstruction threshold: ", threshold_rec)
         threshold_cls = float(np.percentile(total_rec_ssim, quantile))
         print("Classification threshold :", threshold_cls)

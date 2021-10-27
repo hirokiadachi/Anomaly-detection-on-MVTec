@@ -10,7 +10,7 @@ class VAE(nn.Module):
         
         # Encoder
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_ch, 32, kernel_size=4, stride=2, padding=1), # 128 -> 64
+            nn.Conv2d(input_c, 32, kernel_size=4, stride=2, padding=1), # 128 -> 64
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(32, 32, kernel_size=4, stride=2, padding=1),    # 64 -> 32 
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
@@ -33,28 +33,28 @@ class VAE(nn.Module):
 
         # Decoder
         self.decoder = nn.Sequential(
-            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=8, mode='nearest'),
             nn.Conv2d(z_dim, 32, kernel_size=3, stride=1, padding=1),  # 1 -> 8
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),     # 8 -> 8
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),    # 8 -> 8
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),    # 8 -> 16
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),     # 16 -> 16
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),     # 16 -> 32
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),     # 32 -> 32
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Upsample2d(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),     # 32 -> 64
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Upsample2d(scale_factor=2, mode='nearest'),
-            nn.Conv2d(32, in_ch, kernel_size=3, stride=1, padding=1),  # 64 -> 128
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(32, input_c, kernel_size=3, stride=1, padding=1),  # 64 -> 128
             nn.Sigmoid())
 
     def initialize(self):
