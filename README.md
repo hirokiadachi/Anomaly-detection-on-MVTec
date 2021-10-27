@@ -96,6 +96,20 @@ mvtec_anomaly_detection
  |--readme.txt
 ```
 
+## Docker file
+This dockerfile contains the necessary modules to run this code.
+Firstly, please build a docker image with Dockerfile, and then run a docker container.
+```
+cd docker_file
+docker build -t [REPOSITORY]:[TAG] .   Build docker image
+docker run --runtime=nvidia -it --rm -p [port number]:8888 -v [local directory path]:/root --name [container name] --ipc=host [REPOSITORY]:[TAG]
+```
+If you'd like to use Jupyter lab, you execute `set_jupyter_lab.sh` after ran a docker container, please.
+```
+chmod 777 set_jupyter_lab.sh
+./set_jupyter_lab.sh
+```
+
 ## Requirements
 Pytorch: over 1.7.x<br>
 scikit-image<br>
