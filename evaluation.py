@@ -32,7 +32,6 @@ def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters, lo
     save_image(x_org, index, 0, opt_path)
     
     loss = loss_func(x_org, rec_x, reduction='sum')
-    #loss = F.binary_cross_entropy(x_org, rec_x, reduction='sum')
     loss.backward()
     grads = x_org.grad.data
     x_t = x_org - alpha*grads*(x_org - rec_x)**2
@@ -40,7 +39,6 @@ def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters, lo
         x_t = Variable(x_t.clamp(min=0, max=1), requires_grad=True)
         rec_x = model(x_t).detach()
         rec_loss = loss_func(x_t, rec_x, reduction='sum')
-        #rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
         if rec_loss <= th:    break
         l1 = torch.abs(x_t - x_org).sum()
         loss = rec_loss + lam*l1
