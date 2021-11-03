@@ -16,12 +16,13 @@ python3 train.py --data_root ./mvtec_anomaly_detection --category grid --gpu 0 -
 
 ### evaluation phase (anomaly detection)
 ```
-python3 evaluation.py --gpu 0 --model_path ./checkpoint/grid/model --data_root ./mvtec_anomaly_detection --category grid --model_type 'ae'
+python3 evaluation.py --gpu 0 --model_path ./checkpoint/grid/model --data_root ./mvtec_anomaly_detection --category grid --model_type 'ae' --use_grad
 ```
 - model_path: Please refer to the trained model path.
 - data_root: Please refer to the path up to the MVTec dataset directory.
 - category: Please select the category that you want to evaluate.
 - model_type: Please choose the model type from ae or vae.
+- use_grad: If you activate this argument, start to iterative update using model gradients.
 
 ## Dataset
 This implementation presupporses to use **MVTec AD**, so if you'd like to excuse this, you should get MVTec AD bellow link.<br>
