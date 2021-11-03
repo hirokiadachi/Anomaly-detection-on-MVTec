@@ -118,7 +118,7 @@ if __name__ == '__main__':
     data_dir = os.path.join(args.data_root, args.category, 'train/good')
     training_dataloader = return_MVTecAD_loader(data_dir,
                                                 args.category,
-                                                argmentation=False, 
+                                                argmentation=True, 
                                                 rs=512, 
                                                 cs=128, 
                                                 num_data=10000,
