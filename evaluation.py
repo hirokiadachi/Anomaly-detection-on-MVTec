@@ -115,7 +115,8 @@ if __name__ == '__main__':
     os.makedirs(save_path, exist_ok=True)
     
     data_dir = os.path.join(args.data_root, args.category, 'train/good')
-    training_dataloader = return_MVTecAD_loader(data_dir, 
+    training_dataloader = return_MVTecAD_loader(data_dir,
+                                                args.category,
                                                 argmentation=True, 
                                                 rs=512, 
                                                 cs=128, 

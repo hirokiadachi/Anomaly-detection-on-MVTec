@@ -25,14 +25,26 @@ class MVTecAD(Dataset):
             image = self.transform(image)
         return image, torch.zeros(1)
     
-def return_MVTecAD_loader(image_dir, argmentation=True, rs=512, cs=128, num_data=10000, batch_size=128, shuffle=True):
-    transform = T.Compose([
-        T.Resize((rs, rs)),
-        T.RandomCrop((cs, cs)),
-        T.RandomHorizontalFlip(p=0.5),
-        T.RandomVerticalFlip(p=0.5),
-        T.ToTensor(),
-    ])
+def return_MVTecAD_loader(image_dir, category, argmentation=True, rs=512, cs=128, num_data=10000, batch_size=128, shuffle=True):
+    textures = ['carpet', 'grid', 'leather', 'tile', 'wood']
+    objects  = ['bottle', 'cable', 'capsule', 'hazelnut', 'metal_nut', 
+                'pill', 'screw', 'toothbrush', 'transistor', 'zipper']
+    if category in textures:
+        transform = T.Compose([
+            T.Resize((cs, cs)),
+            T.RandomAffine(degrees=[-60, 60], translate=(0.1, 0.1), scale=(0.5, 1.5)),
+            T.RandomHorizontalFlip(p=0.5),
+            T.RandomVerticalFlip(p=0.5),
+            T.ToTensor()
+        ])
+    elif category in objects:
+        transform = T.Compose([
+            T.Resize((rs, rs)),
+            T.RandomCrop((cs, cs)),
+            T.RandomHorizontalFlip(p=0.5),
+            T.RandomVerticalFlip(p=0.5),
+            T.ToTensor(),
+        ])
     
     dataset = MVTecAD(image_dir=image_dir, transform=transform)
     data_loader = DataLoader(dataset, batch_size=len(dataset), shuffle=shuffle, num_workers=multiprocessing.cpu_count())
