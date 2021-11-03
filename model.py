@@ -157,6 +157,6 @@ class AE(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        h      = self.encoder(x)
-        x_hat  = self.decoder(h)
+        h     = self.encoder(x)
+        x_hat = self.decoder(h)
         return x_hat
