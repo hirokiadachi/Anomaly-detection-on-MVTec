@@ -158,7 +158,7 @@ class MVTecDataset(Dataset):
 
         return list(x), list(y), list(mask)
     
-def save_rec_loss(model, dataloader):
+def save_rec_loss(model, dataloader, loss_func):
     cnt = 0
     training_losses = np.zeros(len(dataloader.dataset))
     for (inputs, _) in tqdm(dataloader):
@@ -166,7 +166,7 @@ def save_rec_loss(model, dataloader):
         batch = inputs.size(0)
         with torch.no_grad():
             rec_x = model(inputs)
-        loss = F.binary_cross_entropy(rec_x, inputs, reduction='sum').cpu().data.numpy()
+        loss = loss_func(rec_x, inputs, reduction='sum').cpu().data.numpy()
         training_losses[cnt:cnt+batch] = loss
         cnt += batch
         
@@ -209,3 +209,6 @@ def save_image(x, sample_idx, i, dirpath, mask=None):
         img.save(os.path.join(dirpath, 'mask_sample%d.png' % sample_idx))
     else:
         img.save(os.path.join(dirpath, '{:0>6}.png'.format(i)))
+        
+def l2_squared(x, y, reduction='sum'):
+    return torch.sum((x - y)**2)

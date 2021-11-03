@@ -21,24 +21,26 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
 
-from model import VAE
+from model import VAE, AE
 from utils import *
 
-def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters):
+def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters, loss_func):
     rec_path = os.path.join(save_dir, 'reconstructed_images', 'sample_%d' % index)
     opt_path = os.path.join(save_dir, 'optimized_images', 'sample_%d' % index)
     os.makedirs(rec_path, exist_ok=True)
     os.makedirs(opt_path, exist_ok=True)
     save_image(x_org, index, 0, opt_path)
     
-    loss = F.binary_cross_entropy(x_org, rec_x, reduction='sum')
+    loss = loss_func(x_org, rec_x, reduction='sum')
+    #loss = F.binary_cross_entropy(x_org, rec_x, reduction='sum')
     loss.backward()
     grads = x_org.grad.data
     x_t = x_org - alpha*grads*(x_org - rec_x)**2
     for i in range(max_iters):
         x_t = Variable(x_t.clamp(min=0, max=1), requires_grad=True)
         rec_x = model(x_t).detach()
-        rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
+        rec_loss = loss_func(x_t, rec_x, reduction='sum')
+        #rec_loss = F.binary_cross_entropy(x_t, rec_x, reduction='sum')
         if rec_loss <= th:    break
         l1 = torch.abs(x_t - x_org).sum()
         loss = rec_loss + lam*l1
@@ -53,7 +55,7 @@ def optimize(model, index, save_dir, x_org, rec_x, th, alpha, lam, max_iters):
     make_gif(image_dir_path=opt_path, sample_idx=index)
     return rec_x
     
-def anomaly_detection(model, dataloader, threshold_rec, save_dir, args=None):
+def anomaly_detection(model, dataloader, threshold_rec, save_dir, loss_func, args=None):
     pred_list, label_list = [], []
     for index, (x, y, mask) in tqdm(enumerate(dataloader)):
         mask_path = os.path.join(save_dir, 'mask_images')
@@ -65,7 +67,7 @@ def anomaly_detection(model, dataloader, threshold_rec, save_dir, args=None):
         reconstructed_x = model(x).detach()
         if args.use_grad:
             final_x = optimize(model, index, save_dir, x, reconstructed_x, threshold_rec, 
-                               alpha=args.alpha, lam=args.lam, max_iters=args.max_iters)
+                               alpha=args.alpha, lam=args.lam, max_iters=args.max_iters, loss_func=loss_func)
         else:
             final_x = reconstructed_x
         
@@ -103,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--lam', type=float, default=0.05)
     parser.add_argument('--max_iters', type=int, default=25)
     parser.add_argument('--gpu', type=str, default='0')
+    parser.add_argument('--model_type', type=str, choices=['ae', 'vae'], default='ae')
     parser.add_argument('--use_grad', action='store_true',
                         help='If this argument is true, one detects anomaly samples with the iterative update using the energy function.')
     parser.add_argument('--save_dir', type=str, default='Outputs')
@@ -117,7 +120,7 @@ if __name__ == '__main__':
     data_dir = os.path.join(args.data_root, args.category, 'train/good')
     training_dataloader = return_MVTecAD_loader(data_dir,
                                                 args.category,
-                                                argmentation=True, 
+                                                argmentation=False, 
                                                 rs=512, 
                                                 cs=128, 
                                                 num_data=10000,
@@ -130,19 +133,25 @@ if __name__ == '__main__':
     channel = next(iter(training_dataloader))[0].size(1)
     checkpoint = torch.load(args.model_path)
     state_dict = checkpoint['model_state_dict']
-    model = VAE(z_dim=100, input_c=channel).cuda()
+    
+    if args.model_type == 'vae':
+        loss_func = F.binary_cross_entropy
+        model = VAE(z_dim=100, input_c=channel).cuda()
+    elif args.model_type == 'ae':
+        loss_func = l2_squared
+        model = AE(z_dim=100, input_c=channel).cuda()
     model.load_state_dict(state_dict)
     model.eval()
     
     print('Start to record reconstruction loss for calculating threshold.')
-    training_losses = save_rec_loss(model, training_dataloader)
+    training_losses = save_rec_loss(model, training_dataloader, loss_func)
     
     print("----- start Anomaly detection -----------")
     result_path = os.path.join(save_path, 'results')
     os.makedirs(result_path, exist_ok=True)
     threshold_rec = np.percentile(training_losses, 0)
     print("Reconstruction threshold: ", threshold_rec)
-    anomaly_detection(model, test_dataloader, threshold_rec, result_path, args=args)
+    anomaly_detection(model, test_dataloader, threshold_rec, result_path, loss_func, args=args)
     print("----- end Anomaly detection -------------")
         
         
