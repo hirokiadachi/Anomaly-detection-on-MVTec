@@ -212,3 +212,8 @@ def save_image(x, sample_idx, i, dirpath, mask=None):
         
 def l2_squared(x, y, reduction='sum'):
     return torch.sum((x - y)**2)
+
+def normalize(x):
+    vmax = torch.max(x.flatten(start_dim=1), dim=1)[0]
+    vmin = torch.min(x.flatten(start_dim=1), dim=1)[0]
+    return (x - vmin) / (vmax - vmin)
