@@ -102,7 +102,10 @@ def anomaly_detection(model, dataloader, threshold_rec, save_dir, loss_func, arg
         pred_list.append(dssim_map)
         label_list.append(mask.data.numpy())
         
-        pred_map = torch.where(dssim_map>0.2, 1, 0)
+        pred_map = np.where(dssim_map>0.2, 1, 0) # (H, W)
+        pred_map = torch.from_numpy(pred_map)    # (H, W)
+        pred_map = pred_map.unsqueeze(0)      # (C, H, W)
+        pred_map = pred_map.unsqueeze(0)   # (B, C, H, W)
         pred_path = os.path.join(save_dir, 'pred_images')
         os.makedirs(pred_path, exist_ok=True)
         save_image(pred_map, index, 0, pred_path, mask=True)
